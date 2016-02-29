@@ -10,6 +10,7 @@ import gzip
 import json
 import logging
 import os
+import socket
 import ssl
 import threading
 import time
@@ -64,9 +65,13 @@ def setup(hass, config):
     ssl_certificate = conf.get(CONF_SSL_CERTIFICATE)
     ssl_key = conf.get(CONF_SSL_KEY)
 
+    family, _, _, _, sockaddr = socket.getaddrinfo(
+        server_host, server_port,
+        socket.AF_UNSPEC, socket.SOCK_STREAM, socket.IPPROTO_TCP)[0]
+
     try:
         server = HomeAssistantHTTPServer(
-            (server_host, server_port), RequestHandler, hass, api_password,
+            sockaddr, family, RequestHandler, hass, api_password,
             development, ssl_certificate, ssl_key)
     except OSError:
         # If address already in use
@@ -94,8 +99,10 @@ class HomeAssistantHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
     # pylint: disable=too-many-arguments
-    def __init__(self, server_address, request_handler_class,
+    def __init__(self, server_address, address_family, request_handler_class,
                  hass, api_password, development, ssl_certificate, ssl_key):
+
+        self.address_family = address_family
         super().__init__(server_address, request_handler_class)
 
         self.server_address = server_address
